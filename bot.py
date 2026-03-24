@@ -1,11 +1,12 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+import os
 
 # ─────────────────────────────────────────────
-#  KONFİGÜRASYON  –  Buraya kendi değerlerini gir
+#  KONFİGÜRASYON
 # ─────────────────────────────────────────────
-BOT_TOKEN        = "BOT_TOKEN_BURAYA"
+BOT_TOKEN        = os.environ["BOT_TOKEN"]
 KAYITLI_ROL_ID   = 1484188685812629576
 KAYITSIZ_ROL_ID  = 1484188685757972582
 ADMIN_KANAL_ID   = 1486072691172704276
@@ -72,6 +73,13 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        # 1) Önce kullanıcıya hemen yanıt ver (Discord 3 sn kuralı)
+        await interaction.response.send_message(
+            "✅ Başvurun alındı! Yetkililerin incelemesini bekle.",
+            ephemeral=True,
+        )
+
+        # 2) Sonra embed oluştur ve admin kanalına gönder
         embed = discord.Embed(
             title="🚔 Yeni SASP Başvurusu",
             color=0x1a6ebd,
@@ -94,11 +102,6 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
                 embed=embed,
                 view=BasvuruBildirimView(interaction.user.id),
             )
-
-        await interaction.response.send_message(
-            "✅ Başvurun alındı! Yetkililerin incelemesini bekle.",
-            ephemeral=True,
-        )
 
 
 # ══════════════════════════════════════════════
@@ -159,9 +162,13 @@ class KayitView(discord.ui.View):
             )
             return
 
+        # Hemen deferral al, işlemler uzun sürebilir
+        await interaction.response.defer()
+
         guild = interaction.guild
         hatalar: list[str] = []
 
+        # 1) Kayıtlı rolü ver
         kayitli_rol = guild.get_role(KAYITLI_ROL_ID)
         if kayitli_rol:
             try:
@@ -171,6 +178,7 @@ class KayitView(discord.ui.View):
         else:
             hatalar.append(f"Kayıtlı rol bulunamadı (ID: {KAYITLI_ROL_ID}).")
 
+        # 2) Seçilen rütbe rolünü ver
         rutbe_rol_id = RUTBE_ROLLERI.get(rutbe_adi, 0)
         if rutbe_rol_id:
             rutbe_rol = guild.get_role(rutbe_rol_id)
@@ -184,6 +192,7 @@ class KayitView(discord.ui.View):
         else:
             hatalar.append(f"⚠️ `{rutbe_adi}` için rol ID'si henüz ayarlanmamış.")
 
+        # 3) Kayıtsız rolü kaldır
         kayitsiz_rol = guild.get_role(KAYITSIZ_ROL_ID)
         if kayitsiz_rol and kayitsiz_rol in self.hedef.roles:
             try:
@@ -191,6 +200,7 @@ class KayitView(discord.ui.View):
             except discord.Forbidden:
                 hatalar.append("Kayıtsız rolünü kaldıramadım.")
 
+        # 4) DM – kabul mesajı
         try:
             dm_embed = discord.Embed(
                 title="🚔 SASP Başvurun Kabul Edildi!",
@@ -206,15 +216,19 @@ class KayitView(discord.ui.View):
         except discord.Forbidden:
             hatalar.append("DM gönderemedim (kullanıcı DM kapalı).")
 
+        # 5) Sonucu düzenle
         sonuc = f"✅ **{self.hedef.mention}** kayıt edildi → Rütbe: **{rutbe_adi}**"
         if hatalar:
             sonuc += "\n\n⚠️ Bazı sorunlar:\n" + "\n".join(f"• {h}" for h in hatalar)
 
-        await interaction.response.edit_message(content=sonuc, view=None)
+        await interaction.edit_original_response(content=sonuc, view=None)
         secilen_rutbe.pop(self.hedef.id, None)
 
     @discord.ui.button(label="❌ Red Et", style=discord.ButtonStyle.danger)
     async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Hemen deferral al
+        await interaction.response.defer()
+
         try:
             dm_embed = discord.Embed(
                 title="🚔 SASP Başvurun Red Edildi",
@@ -231,7 +245,7 @@ class KayitView(discord.ui.View):
         except discord.Forbidden:
             dm_bilgi = "⚠️ DM gönderemedim (kullanıcı DM kapalı)."
 
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             content=f"❌ **{self.hedef.mention}** başvurusu red edildi. {dm_bilgi}",
             view=None,
         )
