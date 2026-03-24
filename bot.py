@@ -73,17 +73,12 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        # 1) Önce kullanıcıya hemen yanıt ver (Discord 3 sn kuralı)
         await interaction.response.send_message(
             "✅ Başvurun alındı! Yetkililerin incelemesini bekle.",
             ephemeral=True,
         )
 
-        # 2) Sonra embed oluştur ve admin kanalına gönder
-        embed = discord.Embed(
-            title="🚔 Yeni SASP Başvurusu",
-            color=0x1a6ebd,
-        )
+        embed = discord.Embed(title="🚔 Yeni SASP Başvurusu", color=0x1a6ebd)
         embed.set_author(
             name=str(interaction.user),
             icon_url=interaction.user.display_avatar.url,
@@ -100,26 +95,29 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
             await kanal.send(
                 f"📥 Yeni başvuru: {interaction.user.mention}",
                 embed=embed,
-                view=BasvuruBildirimView(interaction.user.id),
+                view=BasvuruBildirimView(),
             )
 
 
 # ══════════════════════════════════════════════
-#  BAŞVURU BİLDİRİM VIEW
+#  BAŞVURU BİLDİRİM VIEW (kalıcı)
 # ══════════════════════════════════════════════
 class BasvuruBildirimView(discord.ui.View):
-
-    def __init__(self, basvurucu_id: int):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.basvurucu_id = basvurucu_id
 
-    @discord.ui.button(label="📋 Kaydı Aç (/saspkayıt ile işle)", style=discord.ButtonStyle.secondary, disabled=True)
+    @discord.ui.button(
+        label="📋 Kaydı Aç (/saspkayıt ile işle)",
+        style=discord.ButtonStyle.secondary,
+        disabled=True,
+        custom_id="sasp_bilgi_buton",
+    )
     async def bilgi(self, interaction: discord.Interaction, button: discord.ui.Button):
         pass
 
 
 # ══════════════════════════════════════════════
-#  RÜTBE SEÇİMİ – Select Menu
+#  RÜTBE SEÇİMİ – Select Menu (kalıcı)
 # ══════════════════════════════════════════════
 class RutbeSecici(discord.ui.Select):
     def __init__(self, hedef_id: int):
@@ -133,6 +131,7 @@ class RutbeSecici(discord.ui.Select):
             min_values=1,
             max_values=1,
             options=options,
+            custom_id=f"rutbe_secici_{hedef_id}",
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -144,15 +143,19 @@ class RutbeSecici(discord.ui.Select):
 
 
 # ══════════════════════════════════════════════
-#  KAYIT VIEW
+#  KAYIT VIEW (kalıcı)
 # ══════════════════════════════════════════════
 class KayitView(discord.ui.View):
     def __init__(self, hedef: discord.Member):
-        super().__init__(timeout=300)
+        super().__init__(timeout=None)  # timeout=None → kalıcı
         self.hedef = hedef
         self.add_item(RutbeSecici(hedef.id))
 
-    @discord.ui.button(label="✅ Kabul Et", style=discord.ButtonStyle.success)
+    @discord.ui.button(
+        label="✅ Kabul Et",
+        style=discord.ButtonStyle.success,
+        custom_id="sasp_kabul_buton",
+    )
     async def kabul(self, interaction: discord.Interaction, button: discord.ui.Button):
         rutbe_adi = secilen_rutbe.get(self.hedef.id)
         if not rutbe_adi:
@@ -162,13 +165,11 @@ class KayitView(discord.ui.View):
             )
             return
 
-        # Hemen deferral al, işlemler uzun sürebilir
         await interaction.response.defer()
 
         guild = interaction.guild
         hatalar: list[str] = []
 
-        # 1) Kayıtlı rolü ver
         kayitli_rol = guild.get_role(KAYITLI_ROL_ID)
         if kayitli_rol:
             try:
@@ -178,7 +179,6 @@ class KayitView(discord.ui.View):
         else:
             hatalar.append(f"Kayıtlı rol bulunamadı (ID: {KAYITLI_ROL_ID}).")
 
-        # 2) Seçilen rütbe rolünü ver
         rutbe_rol_id = RUTBE_ROLLERI.get(rutbe_adi, 0)
         if rutbe_rol_id:
             rutbe_rol = guild.get_role(rutbe_rol_id)
@@ -190,9 +190,8 @@ class KayitView(discord.ui.View):
             else:
                 hatalar.append(f"{rutbe_adi} rolü sunucuda bulunamadı.")
         else:
-            hatalar.append(f"⚠️ `{rutbe_adi}` için rol ID'si henüz ayarlanmamış.")
+            hatalar.append(f"`{rutbe_adi}` için rol ID'si ayarlanmamış.")
 
-        # 3) Kayıtsız rolü kaldır
         kayitsiz_rol = guild.get_role(KAYITSIZ_ROL_ID)
         if kayitsiz_rol and kayitsiz_rol in self.hedef.roles:
             try:
@@ -200,7 +199,6 @@ class KayitView(discord.ui.View):
             except discord.Forbidden:
                 hatalar.append("Kayıtsız rolünü kaldıramadım.")
 
-        # 4) DM – kabul mesajı
         try:
             dm_embed = discord.Embed(
                 title="🚔 SASP Başvurun Kabul Edildi!",
@@ -216,7 +214,6 @@ class KayitView(discord.ui.View):
         except discord.Forbidden:
             hatalar.append("DM gönderemedim (kullanıcı DM kapalı).")
 
-        # 5) Sonucu düzenle
         sonuc = f"✅ **{self.hedef.mention}** kayıt edildi → Rütbe: **{rutbe_adi}**"
         if hatalar:
             sonuc += "\n\n⚠️ Bazı sorunlar:\n" + "\n".join(f"• {h}" for h in hatalar)
@@ -224,9 +221,12 @@ class KayitView(discord.ui.View):
         await interaction.edit_original_response(content=sonuc, view=None)
         secilen_rutbe.pop(self.hedef.id, None)
 
-    @discord.ui.button(label="❌ Red Et", style=discord.ButtonStyle.danger)
+    @discord.ui.button(
+        label="❌ Red Et",
+        style=discord.ButtonStyle.danger,
+        custom_id="sasp_red_buton",
+    )
     async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Hemen deferral al
         await interaction.response.defer()
 
         try:
@@ -253,10 +253,9 @@ class KayitView(discord.ui.View):
 
 
 # ══════════════════════════════════════════════
-#  BAŞVURU BUTONU VIEW
+#  BAŞVURU BUTONU VIEW (kalıcı)
 # ══════════════════════════════════════════════
 class BasvuruButonView(discord.ui.View):
-
     def __init__(self):
         super().__init__(timeout=None)
 
@@ -279,7 +278,7 @@ class BasvuruButonView(discord.ui.View):
 # ══════════════════════════════════════════════
 #  SLASH KOMUTLARI
 # ══════════════════════════════════════════════
-@bot.tree.command(name="saspkayıt", description="SASP üyesini kayıt et (yetkili komutu)")
+@bot.tree.command(name="saspkayit", description="SASP üyesini kayıt et (yetkili komutu)")
 @app_commands.describe(uye="Kayıt edilecek kişi")
 async def sasp_kayit(interaction: discord.Interaction, uye: discord.Member):
     if not interaction.user.guild_permissions.manage_roles:
@@ -332,7 +331,9 @@ async def basvuru_gonder(interaction: discord.Interaction):
 # ══════════════════════════════════════════════
 @bot.event
 async def on_ready():
+    # Kalıcı view'ları kaydet (restart sonrası da çalışsın)
     bot.add_view(BasvuruButonView())
+    bot.add_view(BasvuruBildirimView())
 
     try:
         synced = await bot.tree.sync()
