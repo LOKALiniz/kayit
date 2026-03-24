@@ -54,20 +54,61 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.send_message("✅ Başvurun alındı! Yetkililerin incelemesini bekle.", ephemeral=True)
+        await interaction.response.send_message(
+            "✅ Başvurun alındı! Yetkililerin incelemesini bekle.", ephemeral=True
+        )
 
-        embed = discord.Embed(title="🚔 Yeni SASP Başvurusu", color=0x1a6ebd)
-        embed.set_author(name=str(interaction.user), icon_url=interaction.user.display_avatar.url)
-        embed.add_field(name="「👮」OOC İsim",      value=self.ooc_isim.value,    inline=True)
-        embed.add_field(name="「👮」Yaş",            value=self.yas.value,         inline=True)
-        embed.add_field(name="「👮」FiveM Saati",    value=self.fivem_saati.value, inline=True)
-        embed.add_field(name="「👮」Map / Ses",      value=self.map_ses.value,     inline=True)
-        embed.add_field(name="「📄」IC & Ek Bilgi", value=self.ic_ve_ek.value,    inline=False)
-        embed.set_footer(text=f"Başvurucu ID: {interaction.user.id}")
+        embed = discord.Embed(
+            title="🚔  YENİ SASP BAŞVURUSU",
+            description=(
+                f">>> {interaction.user.mention} adlı kullanıcı başvuru yaptı.\n"
+                f"Aşağıdan **rütbe seçip** Kabul Et veya Red Et butonuna basın."
+            ),
+            color=0x1a6ebd,
+        )
+        embed.set_author(
+            name=f"{interaction.user.display_name} başvurdu",
+            icon_url=interaction.user.display_avatar.url,
+        )
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+
+        # ── Bilgi satırları ──
+        embed.add_field(
+            name="👤  OOC Bilgiler",
+            value=(
+                f"```\n"
+                f"İsim   : {self.ooc_isim.value}\n"
+                f"Yaş    : {self.yas.value}\n"
+                f"FiveM  : {self.fivem_saati.value} saat\n"
+                f"```"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="🎙️  Map / Ses",
+            value=f"```\n{self.map_ses.value}\n```",
+            inline=True,
+        )
+        embed.add_field(name="\u200b", value="\u200b", inline=False)   # boşluk satırı
+        embed.add_field(
+            name="📋  IC Bilgiler & Ek Bilgiler",
+            value=f"```\n{self.ic_ve_ek.value}\n```",
+            inline=False,
+        )
+
+        embed.set_footer(
+            text=f"Kullanıcı ID: {interaction.user.id}  •  San Andreas State Police",
+            icon_url=interaction.user.display_avatar.url,
+        )
+        embed.timestamp = discord.utils.utcnow()
 
         kanal = bot.get_channel(ADMIN_KANAL_ID)
         if kanal:
-            await kanal.send(f"📥 Yeni başvuru: {interaction.user.mention}", embed=embed)
+            await kanal.send(
+                content="📥 **Yeni başvuru geldi!**",
+                embed=embed,
+                view=kayit_view(interaction.user.id),
+            )
 
 
 # ══════════════════════════════════════════════
@@ -84,6 +125,7 @@ async def on_interaction(interaction: discord.Interaction):
 
     custom_id: str = interaction.data.get("custom_id", "")
 
+    # ── Başvur butonu ──────────────────────────
     if custom_id == "sasp_basvur_buton":
         kayitli_rol = interaction.guild.get_role(KAYITLI_ROL_ID)
         if kayitli_rol and kayitli_rol in interaction.user.roles:
@@ -91,6 +133,7 @@ async def on_interaction(interaction: discord.Interaction):
             return
         await interaction.response.send_modal(BasvuruFormu())
 
+    # ── Rütbe seçici ──────────────────────────
     elif custom_id.startswith("rutbe_"):
         hedef_id = int(custom_id.split("_", 1)[1])
         secilen_deger = interaction.data["values"][0]
@@ -100,6 +143,7 @@ async def on_interaction(interaction: discord.Interaction):
             ephemeral=True,
         )
 
+    # ── Kabul Et ──────────────────────────────
     elif custom_id.startswith("sasp_kabul_"):
         hedef_id = int(custom_id.split("_", 2)[2])
         rutbe_adi = secilen_rutbe.get(hedef_id)
@@ -170,6 +214,7 @@ async def on_interaction(interaction: discord.Interaction):
         await interaction.edit_original_response(content=sonuc)
         secilen_rutbe.pop(hedef_id, None)
 
+    # ── Red Et ────────────────────────────────
     elif custom_id.startswith("sasp_red_"):
         hedef_id = int(custom_id.split("_", 2)[2])
 
@@ -204,7 +249,7 @@ async def on_interaction(interaction: discord.Interaction):
 
 
 # ══════════════════════════════════════════════
-#  BAŞVURU BUTONU VIEW (kalıcı)
+#  BAŞVURU BUTONU VIEW
 # ══════════════════════════════════════════════
 class BasvuruButonView(discord.ui.View):
     def __init__(self):
