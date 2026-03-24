@@ -3,305 +3,309 @@ from discord.ext import commands
 from discord import app_commands
 import os
 
-# ─────────────────────────────────────────────
-BOT_TOKEN       = os.environ.get("BOT_TOKEN")
-KAYITSIZ_ROL_ID = 1484188685757972582
-ADMIN_KANAL_ID  = 1486072691172704276
-KAYIT_KANAL_ID  = 1484188687440019644
+# ──────────────────────────────────────────────
+#  KANAL / ROL ID'LERİ
+# ──────────────────────────────────────────────
+BASVURU_KANAL_ID       = 1484188687440019644  # butonun gönderileceği kanal
+BASVURU_GELEN_KANAL_ID = 1486072691172704276  # formların düşeceği kanal
+MULAKAT_ONAY_ROLE_ID   = 1484188685757972580  # mülakat onay rolü
+MULAKAT_RED_ROLE_ID    = 1484188685757972581  # mülakat red rolü
 
-KABUL_ROL_ID    = 1484188685757972580   # kabul'e basınca verilecek rol
-RED_ROL_ID      = 1484188685757972581   # red'e basınca verilecek rol
-# ─────────────────────────────────────────────
-
+# ──────────────────────────────────────────────
+#  BOT KURULUMU
+# ──────────────────────────────────────────────
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+tree = bot.tree
 
 
-# ══════════════════════════════════════════════
-#  BAŞVURU FORMU
-# ══════════════════════════════════════════════
-class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
+# ──────────────────────────────────────────────
+#  MODAL (FORM)
+# ──────────────────────────────────────────────
+class BasvuruModal(discord.ui.Modal, title="🚔 Polis Departmanı Başvurusu"):
 
     ooc_isim = discord.ui.TextInput(
-        label="OOC İsim",
-        placeholder="Gerçek ismin (OOC)",
-        max_length=32,
+        label="「👮」 OOC İsminiz",
+        placeholder="Adınız Soyadınız",
+        required=True,
+        max_length=50,
     )
-    yas = discord.ui.TextInput(
-        label="Yaş",
-        placeholder="Kaç yaşındasın?",
+    ooc_yas = discord.ui.TextInput(
+        label="「👮」 OOC Yaşınız",
+        placeholder="Örn: 20",
+        required=True,
         max_length=3,
     )
-    fivem_saati = discord.ui.TextInput(
-        label="FiveM Saati (200+)",
-        placeholder="Örn: 270",
-        max_length=6,
+    fivem_bilgiler = discord.ui.TextInput(
+        label="「👮」 FiveM Saati | Map Bilgisi | Ses Kalınlığı",
+        placeholder="Örn: 350 saat | Map: 8/10 | Ses: 7/10",
+        required=True,
+        max_length=100,
     )
-    map_ses = discord.ui.TextInput(
-        label="Map Bilgisi / Ses Kalınlığı (?/10)",
-        placeholder="Map: 8/10 | Ses: 7/10",
-        max_length=40,
+    ic_bilgiler = discord.ui.TextInput(
+        label="「👮」 IC İsim | IC Yaş | Legal Rol Geçmişi?",
+        placeholder="Örn: John Doe | 28 | Evet, 6 ay polis rolü yaptım",
+        required=True,
+        max_length=200,
     )
-    ic_ve_ek = discord.ui.TextInput(
-        label="IC Bilgiler & Ek Bilgiler",
+    ek_bilgiler = discord.ui.TextInput(
+        label="「👮」 Aktiflik | Neden biz? | CK & Kural Kabulü",
+        placeholder="Aktifliğim: Her gün 4-5 saat\nNeden katılmak istiyorum: ...\nNeden alınmalıyım: ...\nCK & Kural kabulü: Evet / Evet",
+        required=True,
         style=discord.TextStyle.paragraph,
-        placeholder=(
-            "IC İsim | IC Yaş | Daha önce legal rol?\n"
-            "Aktiflik | Neden katılmak istiyorsun? | Neden alınmalısın?\n"
-            "CK kabul | Kural kabul"
-        ),
-        max_length=1000,
+        max_length=500,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Hemen yanıt ver → timeout engellenir
-        await interaction.response.send_message(
-            "✅ Başvurun alındı! Yetkililerin incelemesini bekle.",
-            ephemeral=True,
-        )
+        await interaction.response.defer(ephemeral=True)
 
-        embed = discord.Embed(title="🚔  YENİ SASP BAŞVURUSU", color=0x1A6EBD)
+        embed = discord.Embed(
+            title="🚔 POLİS DEPARTMANI BAŞVURUSU",
+            color=0xF0A500,
+        )
         embed.set_author(
-            name=f"{interaction.user.display_name} başvurdu",
+            name=f"{interaction.user} — Yeni Başvuru",
             icon_url=interaction.user.display_avatar.url,
         )
-        embed.set_thumbnail(url=interaction.user.display_avatar.url)
         embed.add_field(
-            name="👤  OOC Bilgiler",
-            value=(
-                f"```\n"
-                f"İsim  : {self.ooc_isim.value}\n"
-                f"Yaş   : {self.yas.value}\n"
-                f"FiveM : {self.fivem_saati.value} saat\n"
-                f"```"
-            ),
-            inline=True,
+            name="━━━━━━ 〔 OOC BİLGİLER 〕 ━━━━━━",
+            value="\u200b",
+            inline=False,
+        )
+        embed.add_field(name="「👮」 OOC İsim", value=f"```{self.ooc_isim.value}```", inline=True)
+        embed.add_field(name="「👮」 OOC Yaş", value=f"```{self.ooc_yas.value}```", inline=True)
+        embed.add_field(
+            name="「👮」 FiveM Saati | Map | Ses",
+            value=f"```{self.fivem_bilgiler.value}```",
+            inline=False,
         )
         embed.add_field(
-            name="🎙️  Map / Ses",
-            value=f"```\n{self.map_ses.value}\n```",
-            inline=True,
+            name="━━━━━━ 〔 IC BİLGİLER 〕 ━━━━━━",
+            value="\u200b",
+            inline=False,
         )
-        embed.add_field(name="\u200b", value="\u200b", inline=False)
         embed.add_field(
-            name="📋  IC Bilgiler & Ek Bilgiler",
-            value=f"```\n{self.ic_ve_ek.value}\n```",
+            name="「👮」 IC İsim | IC Yaş | Legal Geçmiş",
+            value=f"```{self.ic_bilgiler.value}```",
+            inline=False,
+        )
+        embed.add_field(
+            name="━━━━━━ 〔 EK BİLGİLER 〕 ━━━━━━",
+            value="\u200b",
+            inline=False,
+        )
+        embed.add_field(
+            name="「👮」 Aktiflik | Motivasyon | CK & Kural",
+            value=f"```{self.ek_bilgiler.value}```",
             inline=False,
         )
         embed.set_footer(
-            text=f"Kullanıcı ID: {interaction.user.id}  •  San Andreas State Police",
+            text=f"Kullanıcı ID: {interaction.user.id}",
             icon_url=interaction.user.display_avatar.url,
         )
         embed.timestamp = discord.utils.utcnow()
 
-        kanal = bot.get_channel(ADMIN_KANAL_ID)
-        if kanal:
-            await kanal.send(
-                content=f"📥 **Yeni başvuru geldi!** {interaction.user.mention}",
-                embed=embed,
-                view=KayitView(interaction.user.id),
-            )
+        view = YetkiliView(user_id=interaction.user.id)
 
-    async def on_error(self, interaction: discord.Interaction, error: Exception):
-        try:
-            await interaction.response.send_message("❌ Bir hata oluştu, tekrar dene.", ephemeral=True)
-        except discord.InteractionResponded:
-            await interaction.followup.send("❌ Bir hata oluştu, tekrar dene.", ephemeral=True)
-        raise error
+        kanal = bot.get_channel(BASVURU_GELEN_KANAL_ID)
+        await kanal.send(embeds=[embed], view=view)
 
-
-# ══════════════════════════════════════════════
-#  KABUL BUTONU
-# ══════════════════════════════════════════════
-class KabulButon(discord.ui.Button):
-    def __init__(self, hedef_id: int):
-        super().__init__(
-            label="✅ Kabul Et",
-            style=discord.ButtonStyle.success,
-            custom_id=f"sasp_kabul_{hedef_id}",
+        await interaction.followup.send(
+            "✅ Başvurunuz başarıyla iletildi! Yetkililerin incelemesini bekleyiniz.",
+            ephemeral=True,
         )
-        self.hedef_id = hedef_id
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-
-        guild = interaction.guild
-        try:
-            hedef = guild.get_member(self.hedef_id) or await guild.fetch_member(self.hedef_id)
-        except Exception:
-            await interaction.edit_original_response(content="❌ Kullanıcı sunucuda bulunamadı.")
-            return
-
-        hatalar: list[str] = []
-
-        # Kabul rolünü ver
-        kabul_rol = guild.get_role(KABUL_ROL_ID)
-        if kabul_rol:
-            try:
-                await hedef.add_roles(kabul_rol, reason="SASP Başvuru – Kabul")
-            except discord.Forbidden:
-                hatalar.append("Kabul rolünü veremedim (yetki eksik).")
-        else:
-            hatalar.append(f"Kabul rolü bulunamadı (ID: {KABUL_ROL_ID}).")
-
-        # Kayıtsız rolü kaldır
-        kayitsiz_rol = guild.get_role(KAYITSIZ_ROL_ID)
-        if kayitsiz_rol and kayitsiz_rol in hedef.roles:
-            try:
-                await hedef.remove_roles(kayitsiz_rol, reason="SASP Kayıt tamamlandı")
-            except discord.Forbidden:
-                hatalar.append("Kayıtsız rolünü kaldıramadım.")
-
-        # DM gönder
-        try:
-            dm_embed = discord.Embed(
-                title="🚔 SASP Başvurun Kabul Edildi!",
-                description=(
-                    f"Merhaba **{hedef.display_name}**,\n\n"
-                    "SASP başvurun **kabul** edilmiştir. 🎉\n\n"
-                    "Sunucuya hoş geldin, görevine başarılar!"
-                ),
-                color=0x2ECC71,
-            )
-            await hedef.send(embed=dm_embed)
-        except discord.Forbidden:
-            hatalar.append("DM gönderemedim (kullanıcı DM kapalı).")
-
-        sonuc = f"✅ **{hedef.mention}** kabul edildi."
-        if hatalar:
-            sonuc += "\n\n⚠️ Bazı sorunlar:\n" + "\n".join(f"• {h}" for h in hatalar)
-
-        await interaction.edit_original_response(content=sonuc, view=None)
 
 
-# ══════════════════════════════════════════════
-#  RED BUTONU
-# ══════════════════════════════════════════════
-class RedButon(discord.ui.Button):
-    def __init__(self, hedef_id: int):
-        super().__init__(
-            label="❌ Red Et",
-            style=discord.ButtonStyle.danger,
-            custom_id=f"sasp_red_{hedef_id}",
-        )
-        self.hedef_id = hedef_id
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-
-        guild = interaction.guild
-        try:
-            hedef = guild.get_member(self.hedef_id) or await guild.fetch_member(self.hedef_id)
-        except Exception:
-            await interaction.edit_original_response(content="❌ Kullanıcı sunucuda bulunamadı.")
-            return
-
-        hatalar: list[str] = []
-
-        # Red rolünü ver
-        red_rol = guild.get_role(RED_ROL_ID)
-        if red_rol:
-            try:
-                await hedef.add_roles(red_rol, reason="SASP Başvuru – Red")
-            except discord.Forbidden:
-                hatalar.append("Red rolünü veremedim (yetki eksik).")
-        else:
-            hatalar.append(f"Red rolü bulunamadı (ID: {RED_ROL_ID}).")
-
-        # DM gönder
-        try:
-            dm_embed = discord.Embed(
-                title="🚔 SASP Başvurun Red Edildi",
-                description=(
-                    f"Merhaba **{hedef.display_name}**,\n\n"
-                    "Üzgünüz, SASP başvurun **red** edilmiştir. ❌\n\n"
-                    "Daha sonra tekrar başvurabilirsin.\nBaşarılar!"
-                ),
-                color=0xE74C3C,
-            )
-            await hedef.send(embed=dm_embed)
-            dm_bilgi = "✅ Kullanıcıya DM ile bildirildi."
-        except discord.Forbidden:
-            dm_bilgi = "⚠️ DM gönderemedim (kullanıcı DM kapalı)."
-
-        sonuc = f"❌ **{hedef.mention}** başvurusu red edildi. {dm_bilgi}"
-        if hatalar:
-            sonuc += "\n\n⚠️ Bazı sorunlar:\n" + "\n".join(f"• {h}" for h in hatalar)
-
-        await interaction.edit_original_response(content=sonuc, view=None)
-
-
-# ══════════════════════════════════════════════
-#  KAYIT VIEW  (sadece Kabul + Red, rütbe yok)
-# ══════════════════════════════════════════════
-class KayitView(discord.ui.View):
-    def __init__(self, hedef_id: int):
-        super().__init__(timeout=None)
-        self.add_item(KabulButon(hedef_id))
-        self.add_item(RedButon(hedef_id))
-
-
-# ══════════════════════════════════════════════
-#  BAŞVURU BUTONU VIEW  (kalıcı)
-# ══════════════════════════════════════════════
-class BasvuruButonView(discord.ui.View):
+# ──────────────────────────────────────────────
+#  BAŞVURU BUTONU (başvuru kanalındaki buton)
+# ──────────────────────────────────────────────
+class BasvuruView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="📝 Başvur",
+        label="📝  BAŞVURU YAP",
         style=discord.ButtonStyle.primary,
-        custom_id="sasp_basvur_buton",
+        custom_id="basvuru_ac",
     )
-    async def basvur(self, interaction: discord.Interaction, button: discord.ui.Button):
-        kabul_rol = interaction.guild.get_role(KABUL_ROL_ID)
-        if kabul_rol and kabul_rol in interaction.user.roles:
-            await interaction.response.send_message(
-                "⚠️ Zaten SASP üyesisin, tekrar başvuramazsın.", ephemeral=True
+    async def basvuru_ac(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(BasvuruModal())
+
+
+# ──────────────────────────────────────────────
+#  YETKİLİ BUTONLARI (form düştükten sonra)
+# ──────────────────────────────────────────────
+class YetkiliView(discord.ui.View):
+    def __init__(self, user_id: int):
+        super().__init__(timeout=None)
+        self.user_id = user_id
+
+    def _yetkili_mi(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.guild_permissions.manage_roles
+
+    async def _guncelle_embed(self, interaction: discord.Interaction, renk: int, baslik: str):
+        embed = interaction.message.embeds[0]
+        embed.color = renk
+        embed.title = baslik
+        await interaction.message.edit(embed=embed, view=None)
+
+    @discord.ui.button(label="✅  Onayla", style=discord.ButtonStyle.success, custom_id="onay")
+    async def onay(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self._yetkili_mi(interaction):
+            return await interaction.response.send_message("❌ Yetkin yok.", ephemeral=True)
+
+        await interaction.response.defer()
+
+        hedef = interaction.guild.get_member(self.user_id)
+        if hedef:
+            dm_embed = discord.Embed(
+                title="✅ Başvurunuz Onaylandı!",
+                description=(
+                    "**Polis Departmanı** başvurunuz **kabul edildi!**\n\n"
+                    "> Mülakat onay permini aldıktan sonra mülakat kanalına geçebilirsin.\n"
+                    "> Başarılar dileriz! 🚔"
+                ),
+                color=0x2ECC71,
             )
-            return
-        await interaction.response.send_modal(BasvuruFormu())
+            dm_embed.set_footer(text=f"Yetkili: {interaction.user}")
+            dm_embed.timestamp = discord.utils.utcnow()
+            try:
+                await hedef.send(embed=dm_embed)
+            except discord.Forbidden:
+                pass
+
+        await self._guncelle_embed(interaction, 0x2ECC71, "🚔 POLİS DEPARTMANI BAŞVURUSU — ✅ ONAYLANDI")
+        await interaction.followup.send(f"✅ Başvuru onaylandı, kullanıcıya DM gönderildi.", ephemeral=True)
+
+    @discord.ui.button(label="❌  Reddet", style=discord.ButtonStyle.danger, custom_id="red")
+    async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self._yetkili_mi(interaction):
+            return await interaction.response.send_message("❌ Yetkin yok.", ephemeral=True)
+
+        await interaction.response.defer()
+
+        hedef = interaction.guild.get_member(self.user_id)
+        if hedef:
+            dm_embed = discord.Embed(
+                title="❌ Başvurunuz Reddedildi",
+                description=(
+                    "**Polis Departmanı** başvurunuz **reddedildi.**\n\n"
+                    "> Daha sonra tekrar başvurabilirsin.\n"
+                    "> İyi günler dileriz."
+                ),
+                color=0xE74C3C,
+            )
+            dm_embed.set_footer(text=f"Yetkili: {interaction.user}")
+            dm_embed.timestamp = discord.utils.utcnow()
+            try:
+                await hedef.send(embed=dm_embed)
+            except discord.Forbidden:
+                pass
+
+        await self._guncelle_embed(interaction, 0xE74C3C, "🚔 POLİS DEPARTMANI BAŞVURUSU — ❌ REDDEDİLDİ")
+        await interaction.followup.send(f"❌ Başvuru reddedildi, kullanıcıya DM gönderildi.", ephemeral=True)
+
+    @discord.ui.button(label="🎤  Mülakat Onayı Ver", style=discord.ButtonStyle.primary, custom_id="mulakat")
+    async def mulakat(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self._yetkili_mi(interaction):
+            return await interaction.response.send_message("❌ Yetkin yok.", ephemeral=True)
+
+        await interaction.response.defer()
+
+        hedef = interaction.guild.get_member(self.user_id)
+        if not hedef:
+            return await interaction.followup.send("❌ Kullanıcı sunucuda bulunamadı.", ephemeral=True)
+
+        rol = interaction.guild.get_role(MULAKAT_ONAY_ROLE_ID)
+        if rol:
+            try:
+                await hedef.add_roles(rol)
+            except discord.Forbidden:
+                return await interaction.followup.send("❌ Rol verilemedi, bot yetkilerini kontrol et.", ephemeral=True)
+
+        dm_embed = discord.Embed(
+            title="🎤 Mülakat Onayı Verildi!",
+            description=(
+                "**Mülakat Onay** permin verildi!\n\n"
+                "> Artık mülakat kanalına girerek mülakatını tamamlayabilirsin.\n"
+                "> Bol şans! 🚔"
+            ),
+            color=0x3498DB,
+        )
+        dm_embed.set_footer(text=f"Yetkili: {interaction.user}")
+        dm_embed.timestamp = discord.utils.utcnow()
+        try:
+            await hedef.send(embed=dm_embed)
+        except discord.Forbidden:
+            pass
+
+        await self._guncelle_embed(interaction, 0x3498DB, "🚔 POLİS DEPARTMANI BAŞVURUSU — 🎤 MÜLAKAT ONAY VERİLDİ")
+        await interaction.followup.send(f"🎤 Mülakat onayı verildi, kullanıcıya DM gönderildi.", ephemeral=True)
 
 
-# ══════════════════════════════════════════════
-#  SLASH KOMUTLARI
-# ══════════════════════════════════════════════
-@bot.tree.command(name="basurugonder", description="Başvuru butonunu kanalda yayınla")
-async def basvuru_gonder(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("🚫 Sadece adminler kullanabilir.", ephemeral=True)
-        return
+# ──────────────────────────────────────────────
+#  SLASH COMMAND: /basvurugonder
+# ──────────────────────────────────────────────
+@tree.command(name="basvurugonder", description="Başvuru butonunu belirtilen kanala gönderir. (Sadece Admin)")
+@app_commands.checks.has_permissions(administrator=True)
+async def basvurugonder(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
 
     embed = discord.Embed(
-        title="🚔 San Andreas State Police – Başvuru",
+        title="🚔 POLİS DEPARTMANI BAŞVURU SİSTEMİ",
         description=(
-            "SASP'a katılmak istiyorsan aşağıdaki **📝 Başvur** butonuna tıklayarak formu doldur.\n\n"
-            "**Gereksinimler:**\n"
-            "• 200+ FiveM saati\n"
-            "• Sunucu ve oluşum kurallarını kabul etmek\n"
-            "• CK kabulü"
+            "```\n"
+            "BAŞVURUNUZ TEKER TEKER İNCELENECEKTİR\n"
+            "```\n\n"
+            "> **ZAMAN SIKINTISI OLMAYAN** ve **HARD ROL YAPABİLEN** "
+            "arkadaşlar başvuru atabilir.\n"
+            "> Mülakata girebilmek için başvurunuzun **onaylanması** ve "
+            "**Mülakat Onay** perminizin olması gerekmektedir.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "📋 **BAŞVURU FORMU İÇERİĞİ**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "**[ OOC BİLGİLER ]**\n"
+            "「👮」İsim\n「👮」Yaş\n「👮」FiveM Saati (200+)\n"
+            "「👮」Map Bilgisi (?/10)\n「👮」Ses Kalınlığı (?/10)\n\n"
+            "**[ IC BİLGİLER ]**\n"
+            "「👮」IC İsim\n「👮」IC Yaş\n「👮」Daha önce legal rol yaptınız mı?\n\n"
+            "**[ EK BİLGİLER ]**\n"
+            "「👮」Aktiflik Süreniz\n「👮」Neden bize katılmak istiyorsunuz?\n"
+            "「👮」Sizi neden almalıyız?\n「👮」CK yemeyi kabul ediyor musunuz?\n"
+            "「👮」Sunucu ve Oluşum Kurallarını kabul ediyor musunuz?"
         ),
-        color=0x1A6EBD,
+        color=0x1A1A2E,
     )
-    await interaction.channel.send(embed=embed, view=BasvuruButonView())
-    await interaction.response.send_message("✅ Başvuru mesajı gönderildi.", ephemeral=True)
+    embed.set_footer(
+        text="Polis Departmanı • Başvuru Sistemi",
+        icon_url=interaction.guild.icon.url if interaction.guild.icon else None,
+    )
+    embed.timestamp = discord.utils.utcnow()
+
+    kanal = bot.get_channel(BASVURU_KANAL_ID)
+    await kanal.send(embed=embed, view=BasvuruView())
+    await interaction.followup.send("✅ Başvuru mesajı gönderildi!", ephemeral=True)
 
 
-# ══════════════════════════════════════════════
+@basvurugonder.error
+async def basvurugonder_error(interaction: discord.Interaction, error):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message("❌ Bu komutu kullanmak için **Admin** yetkisine ihtiyacın var.", ephemeral=True)
+
+
+# ──────────────────────────────────────────────
 #  BOT HAZIR
-# ══════════════════════════════════════════════
+# ──────────────────────────────────────────────
 @bot.event
 async def on_ready():
-    bot.add_view(BasvuruButonView())
-    try:
-        synced = await bot.tree.sync()
-        print(f"✅ {len(synced)} slash komutu sync edildi.")
-    except Exception as e:
-        print(f"Sync hatası: {e}")
-    print(f"🤖 Bot hazır → {bot.user} ({bot.user.id})")
+    # Persistent view'ları kaydet (bot restart'ta butonlar çalışmaya devam eder)
+    bot.add_view(BasvuruView())
+    # Slash command'ları sync et
+    await tree.sync()
+    print(f"✅ Bot hazır: {bot.user} | Slash komutlar sync edildi.")
 
 
-bot.run(BOT_TOKEN)
+bot.run(os.environ["BOT_TOKEN"])
