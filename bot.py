@@ -45,12 +45,15 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
     ic_ve_ek = discord.ui.TextInput(
         label="IC Bilgiler & Ek Bilgiler",
         style=discord.TextStyle.paragraph,
-        placeholder="IC İsim | IC Yaş | Legal rol?\nAktiflik | Neden katılmak istiyorsun?\nCK kabul | Kural kabul",
+        placeholder=(
+            "IC İsim | IC Yaş | Daha önce legal rol?\n"
+            "Aktiflik | Neden katılmak istiyorsun? | Neden alınmalısın?\n"
+            "CK kabul | Kural kabul"
+        ),
         max_length=1000,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        # DÜZELTME: Önce Discord'a yanıt ver, sonra diğer işlemleri yap
         await interaction.response.send_message("✅ Başvurun alındı! Yetkililerin incelemesini bekle.", ephemeral=True)
 
         embed = discord.Embed(title="🚔 Yeni SASP Başvurusu", color=0x1a6ebd)
@@ -69,22 +72,18 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
 
 # ══════════════════════════════════════════════
 #  on_interaction — tüm buton/select olaylarını yakala
-#  Bu sayede bot restart sonrası da her şey çalışır
 # ══════════════════════════════════════════════
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
-    # Slash komutlarını normal işle
     if interaction.type == discord.InteractionType.application_command:
         await bot.process_application_commands(interaction)
         return
 
-    # Sadece component etkileşimlerini ele al
     if interaction.type != discord.InteractionType.component:
         return
 
     custom_id: str = interaction.data.get("custom_id", "")
 
-    # ── Başvur butonu ──────────────────────────
     if custom_id == "sasp_basvur_buton":
         kayitli_rol = interaction.guild.get_role(KAYITLI_ROL_ID)
         if kayitli_rol and kayitli_rol in interaction.user.roles:
@@ -92,7 +91,6 @@ async def on_interaction(interaction: discord.Interaction):
             return
         await interaction.response.send_modal(BasvuruFormu())
 
-    # ── Rütbe seçici ──────────────────────────
     elif custom_id.startswith("rutbe_"):
         hedef_id = int(custom_id.split("_", 1)[1])
         secilen_deger = interaction.data["values"][0]
@@ -102,7 +100,6 @@ async def on_interaction(interaction: discord.Interaction):
             ephemeral=True,
         )
 
-    # ── Kabul Et ──────────────────────────────
     elif custom_id.startswith("sasp_kabul_"):
         hedef_id = int(custom_id.split("_", 2)[2])
         rutbe_adi = secilen_rutbe.get(hedef_id)
@@ -111,7 +108,6 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_message("⚠️ Önce yukarıdaki menüden bir rütbe seç!", ephemeral=True)
             return
 
-        # DÜZELTME: Önce defer al, uzun işlemler sonra
         await interaction.response.defer()
 
         guild = interaction.guild
@@ -174,7 +170,6 @@ async def on_interaction(interaction: discord.Interaction):
         await interaction.edit_original_response(content=sonuc)
         secilen_rutbe.pop(hedef_id, None)
 
-    # ── Red Et ────────────────────────────────
     elif custom_id.startswith("sasp_red_"):
         hedef_id = int(custom_id.split("_", 2)[2])
 
@@ -209,7 +204,7 @@ async def on_interaction(interaction: discord.Interaction):
 
 
 # ══════════════════════════════════════════════
-#  BAŞVURU BUTONU VIEW (kalıcı, sadece başvur butonu)
+#  BAŞVURU BUTONU VIEW (kalıcı)
 # ══════════════════════════════════════════════
 class BasvuruButonView(discord.ui.View):
     def __init__(self):
@@ -221,7 +216,7 @@ class BasvuruButonView(discord.ui.View):
 
 
 # ══════════════════════════════════════════════
-#  KAYIT MESAJI BUILDER — dinamik custom_id'ler
+#  KAYIT MESAJI BUILDER
 # ══════════════════════════════════════════════
 def kayit_view(hedef_id: int) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
