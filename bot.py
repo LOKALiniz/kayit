@@ -40,108 +40,56 @@ secilen_rutbe: dict[int, str] = {}
 # ══════════════════════════════════════════════
 class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
 
-    ooc_isim = discord.ui.TextInput(
-        label="OOC İsim",
-        placeholder="Gerçek ismin (OOC)",
-        max_length=32,
-    )
-    yas = discord.ui.TextInput(
-        label="Yaş",
-        placeholder="Kaç yaşındasın?",
-        max_length=3,
-    )
-    fivem_saati = discord.ui.TextInput(
-        label="FiveM Saati (200+)",
-        placeholder="Örn: 270",
-        max_length=6,
-    )
-    map_ses = discord.ui.TextInput(
-        label="Map Bilgisi / Ses Kalınlığı (?/10)",
-        placeholder="Map: 8/10 | Ses: 7/10",
-        max_length=40,
-    )
+    ooc_isim = discord.ui.TextInput(label="OOC İsim", placeholder="Gerçek ismin (OOC)", max_length=32)
+    yas = discord.ui.TextInput(label="Yaş", placeholder="Kaç yaşındasın?", max_length=3)
+    fivem_saati = discord.ui.TextInput(label="FiveM Saati (200+)", placeholder="Örn: 270", max_length=6)
+    map_ses = discord.ui.TextInput(label="Map Bilgisi / Ses Kalınlığı (?/10)", placeholder="Map: 8/10 | Ses: 7/10", max_length=40)
     ic_ve_ek = discord.ui.TextInput(
         label="IC Bilgiler & Ek Bilgiler",
         style=discord.TextStyle.paragraph,
-        placeholder=(
-            "IC İsim | IC Yaş | Daha önce legal rol?\n"
-            "Aktiflik | Neden katılmak istiyorsun? | Neden alınmalısın?\n"
-            "CK kabul | Kural kabul"
-        ),
+        placeholder="IC İsim | IC Yaş | Daha önce legal rol?\nAktiflik | Neden katılmak istiyorsun?\nCK kabul | Kural kabul",
         max_length=1000,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        # ✅ FIX: Önce hemen yanıt ver, timeout engellenir
+        # Hemen yanıt ver (3sn timeout aşılmasın)
         await interaction.response.send_message(
-            "✅ Başvurun alındı! Yetkililerin incelemesini bekle.",
-            ephemeral=True,
+            "✅ Başvurun alındı! Yetkililerin incelemesini bekle.", ephemeral=True
         )
 
-        # Sonra admin kanalına gönder (3 sn limiti artık geçerli değil)
-        embed = discord.Embed(
-            title="🚔  YENİ SASP BAŞVURUSU",
-            description=(
-                f">>> {interaction.user.mention} adlı kullanıcı başvuru yaptı.\n"
-                "Aşağıdan **rütbe seçip** Kabul Et veya Red Et butonuna basın."
-            ),
-            color=0x1A6EBD,
-        )
-        embed.set_author(
-            name=f"{interaction.user.display_name} başvurdu",
-            icon_url=interaction.user.display_avatar.url,
-        )
+        embed = discord.Embed(title="🚔  YENİ SASP BAŞVURUSU", color=0x1A6EBD)
+        embed.set_author(name=f"{interaction.user.display_name} başvurdu", icon_url=interaction.user.display_avatar.url)
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
         embed.add_field(
             name="👤  OOC Bilgiler",
-            value=(
-                f"```\n"
-                f"İsim  : {self.ooc_isim.value}\n"
-                f"Yaş   : {self.yas.value}\n"
-                f"FiveM : {self.fivem_saati.value} saat\n"
-                f"```"
-            ),
+            value=f"```\nİsim  : {self.ooc_isim.value}\nYaş   : {self.yas.value}\nFiveM : {self.fivem_saati.value} saat\n```",
             inline=True,
         )
-        embed.add_field(
-            name="🎙️  Map / Ses",
-            value=f"```\n{self.map_ses.value}\n```",
-            inline=True,
-        )
+        embed.add_field(name="🎙️  Map / Ses", value=f"```\n{self.map_ses.value}\n```", inline=True)
         embed.add_field(name="\u200b", value="\u200b", inline=False)
-        embed.add_field(
-            name="📋  IC Bilgiler & Ek Bilgiler",
-            value=f"```\n{self.ic_ve_ek.value}\n```",
-            inline=False,
-        )
-        embed.set_footer(
-            text=f"Kullanıcı ID: {interaction.user.id}  •  San Andreas State Police",
-            icon_url=interaction.user.display_avatar.url,
-        )
+        embed.add_field(name="📋  IC Bilgiler & Ek Bilgiler", value=f"```\n{self.ic_ve_ek.value}\n```", inline=False)
+        embed.set_footer(text=f"Kullanıcı ID: {interaction.user.id}  •  San Andreas State Police")
         embed.timestamp = discord.utils.utcnow()
 
         kanal = bot.get_channel(ADMIN_KANAL_ID)
         if kanal:
+            # hedef_id custom_id içine gömülüyor → restart sonrası da çalışır
             await kanal.send(
-                content="📥 **Yeni başvuru geldi!**",
+                content=f"📥 **Yeni başvuru geldi!** {interaction.user.mention}",
                 embed=embed,
                 view=KayitView(interaction.user.id),
             )
 
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         try:
-            await interaction.response.send_message(
-                "❌ Bir hata oluştu, lütfen tekrar dene.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ Bir hata oluştu, tekrar dene.", ephemeral=True)
         except discord.InteractionResponded:
-            await interaction.followup.send(
-                "❌ Bir hata oluştu, lütfen tekrar dene.", ephemeral=True
-            )
+            await interaction.followup.send("❌ Bir hata oluştu, tekrar dene.", ephemeral=True)
         raise error
 
 
 # ══════════════════════════════════════════════
-#  RÜTBE SEÇİCİ
+#  RÜTBE SEÇİCİ  (dynamic custom_id — her başvuru için ayrı)
 # ══════════════════════════════════════════════
 class RutbeSecici(discord.ui.Select):
     def __init__(self, hedef_id: int):
@@ -152,32 +100,30 @@ class RutbeSecici(discord.ui.Select):
             min_values=1,
             max_values=1,
             options=options,
-            custom_id=f"rutbe_{hedef_id}",
+            custom_id=f"rutbe_sec_{hedef_id}",   # ← benzersiz
         )
 
     async def callback(self, interaction: discord.Interaction):
         secilen_rutbe[self.hedef_id] = self.values[0]
         await interaction.response.send_message(
-            f"✅ Rütbe **{self.values[0]}** seçildi. Şimdi Kabul Et veya Red Et butonuna bas.",
+            f"✅ Rütbe **{self.values[0]}** seçildi. Kabul Et veya Red Et butonuna bas.",
             ephemeral=True,
         )
 
 
 # ══════════════════════════════════════════════
-#  KAYIT VIEW  (Rütbe seçici + Kabul/Red butonları)
+#  KABUL BUTONU  (kalıcı, custom_id içinde hedef_id var)
 # ══════════════════════════════════════════════
-class KayitView(discord.ui.View):
+class KabulButon(discord.ui.Button):
     def __init__(self, hedef_id: int):
-        super().__init__(timeout=None)
+        super().__init__(
+            label="✅ Kabul Et",
+            style=discord.ButtonStyle.success,
+            custom_id=f"sasp_kabul_{hedef_id}",   # ← benzersiz + kalıcı
+        )
         self.hedef_id = hedef_id
-        self.add_item(RutbeSecici(hedef_id))
 
-    @discord.ui.button(
-        label="✅ Kabul Et",
-        style=discord.ButtonStyle.success,
-        custom_id="sasp_kabul",
-    )
-    async def kabul(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def callback(self, interaction: discord.Interaction):
         rutbe_adi = secilen_rutbe.get(self.hedef_id)
         if not rutbe_adi:
             await interaction.response.send_message(
@@ -185,9 +131,7 @@ class KayitView(discord.ui.View):
             )
             return
 
-        # ✅ FIX: Rol işlemleri zaman alır, hemen defer et
         await interaction.response.defer()
-
         guild = interaction.guild
         try:
             hedef = guild.get_member(self.hedef_id) or await guild.fetch_member(self.hedef_id)
@@ -197,6 +141,7 @@ class KayitView(discord.ui.View):
 
         hatalar: list[str] = []
 
+        # Kayıtlı rolü ver
         kayitli_rol = guild.get_role(KAYITLI_ROL_ID)
         if kayitli_rol:
             try:
@@ -206,6 +151,7 @@ class KayitView(discord.ui.View):
         else:
             hatalar.append(f"Kayıtlı rol bulunamadı (ID: {KAYITLI_ROL_ID}).")
 
+        # Rütbe rolünü ver
         rutbe_rol_id = RUTBE_ROLLERI.get(rutbe_adi, 0)
         if rutbe_rol_id:
             rutbe_rol = guild.get_role(rutbe_rol_id)
@@ -219,6 +165,7 @@ class KayitView(discord.ui.View):
         else:
             hatalar.append(f"`{rutbe_adi}` için rol ID'si ayarlanmamış.")
 
+        # Kayıtsız rolü kaldır
         kayitsiz_rol = guild.get_role(KAYITSIZ_ROL_ID)
         if kayitsiz_rol and kayitsiz_rol in hedef.roles:
             try:
@@ -226,6 +173,7 @@ class KayitView(discord.ui.View):
             except discord.Forbidden:
                 hatalar.append("Kayıtsız rolünü kaldıramadım.")
 
+        # DM gönder
         try:
             dm_embed = discord.Embed(
                 title="🚔 SASP Başvurun Kabul Edildi!",
@@ -248,15 +196,21 @@ class KayitView(discord.ui.View):
         await interaction.edit_original_response(content=sonuc, view=None)
         secilen_rutbe.pop(self.hedef_id, None)
 
-    @discord.ui.button(
-        label="❌ Red Et",
-        style=discord.ButtonStyle.danger,
-        custom_id="sasp_red",
-    )
-    async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # ✅ FIX: Hemen defer et
-        await interaction.response.defer()
 
+# ══════════════════════════════════════════════
+#  RED BUTONU  (kalıcı)
+# ══════════════════════════════════════════════
+class RedButon(discord.ui.Button):
+    def __init__(self, hedef_id: int):
+        super().__init__(
+            label="❌ Red Et",
+            style=discord.ButtonStyle.danger,
+            custom_id=f"sasp_red_{hedef_id}",   # ← benzersiz + kalıcı
+        )
+        self.hedef_id = hedef_id
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         guild = interaction.guild
         try:
             hedef = guild.get_member(self.hedef_id) or await guild.fetch_member(self.hedef_id)
@@ -287,7 +241,18 @@ class KayitView(discord.ui.View):
 
 
 # ══════════════════════════════════════════════
-#  BAŞVURU BUTONU VIEW
+#  KAYIT VIEW  (dinamik butonlar, her başvuruya özel)
+# ══════════════════════════════════════════════
+class KayitView(discord.ui.View):
+    def __init__(self, hedef_id: int):
+        super().__init__(timeout=None)
+        self.add_item(RutbeSecici(hedef_id))
+        self.add_item(KabulButon(hedef_id))
+        self.add_item(RedButon(hedef_id))
+
+
+# ══════════════════════════════════════════════
+#  BAŞVURU BUTONU VIEW  (kalıcı)
 # ══════════════════════════════════════════════
 class BasvuruButonView(discord.ui.View):
     def __init__(self):
@@ -315,17 +280,12 @@ class BasvuruButonView(discord.ui.View):
 @app_commands.describe(uye="Kayıt edilecek kişi")
 async def sasp_kayit(interaction: discord.Interaction, uye: discord.Member):
     if not interaction.user.guild_permissions.manage_roles:
-        await interaction.response.send_message(
-            "🚫 Bu komutu kullanma yetkin yok.", ephemeral=True
-        )
+        await interaction.response.send_message("🚫 Bu komutu kullanma yetkin yok.", ephemeral=True)
         return
 
     embed = discord.Embed(
         title=f"🚔 SASP Kayıt – {uye.display_name}",
-        description=(
-            f"Kullanıcı: {uye.mention} (`{uye.id}`)\n"
-            "Aşağıdan **rütbe seç**, ardından Kabul Et veya Red Et butonuna bas."
-        ),
+        description=f"Kullanıcı: {uye.mention} (`{uye.id}`)\nAşağıdan **rütbe seç**, ardından Kabul Et veya Red Et butonuna bas.",
         color=0x1A6EBD,
     )
     embed.set_thumbnail(url=uye.display_avatar.url)
@@ -335,9 +295,7 @@ async def sasp_kayit(interaction: discord.Interaction, uye: discord.Member):
 @bot.tree.command(name="basurugonder", description="Başvuru butonunu kanalda yayınla")
 async def basvuru_gonder(interaction: discord.Interaction):
     if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message(
-            "🚫 Sadece adminler kullanabilir.", ephemeral=True
-        )
+        await interaction.response.send_message("🚫 Sadece adminler kullanabilir.", ephemeral=True)
         return
 
     embed = discord.Embed(
@@ -360,7 +318,6 @@ async def basvuru_gonder(interaction: discord.Interaction):
 # ══════════════════════════════════════════════
 @bot.event
 async def on_ready():
-    # ✅ FIX: Persistent view'ı kaydet — bot restart sonrası butonlar çalışmaya devam eder
     bot.add_view(BasvuruButonView())
     try:
         synced = await bot.tree.sync()
