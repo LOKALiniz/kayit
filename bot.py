@@ -3,10 +3,12 @@ from discord.ext import commands
 from discord import app_commands
 import os
 
-BASVURU_KANAL_ID       = 1484188687440019644
-BASVURU_GELEN_KANAL_ID = 1486072691172704276
-MULAKAT_ONAY_ROLE_ID   = 1484188685757972580 # Onay ve Mülakat için ortak rol
-RED_ROLE_ID            = 1484188685757972581 # Red durumunda verilecek rol
+# ── AYARLAR (ID'LER) ──────────────────────────────────────────────────────────
+BASVURU_KANAL_ID       = 1484188687440019644  # Başvuru butonunun duracağı kanal
+BASVURU_GELEN_KANAL_ID = 1486072691172704276  # Başvuruların yetkililere düştüğü kanal
+MULAKAT_ONAY_ROLE_ID   = 1484188685757972580  # Onaylanan ve Mülakat Onayı alanlara verilecek rol
+RED_ROLE_ID            = 1484188685757972581  # Reddedilenlere verilecek rol
+YETKILI_ROL_ID         = 1484188685850120193  # Yeni başvuru gelince etiketlenecek yetkili rolü
 
 intents = discord.Intents.default()
 intents.members = True
@@ -14,15 +16,17 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ── BUTON FONKSİYONLARI ──
+# ── BUTON GÖRÜNÜMLERİ ──────────────────────────────────────────────────────────
 
 def basvuru_buton_view():
+    """Başvuru kanalındaki 'Başvuru Yap' butonu"""
     view = discord.ui.View(timeout=None)
     btn  = discord.ui.Button(style=discord.ButtonStyle.primary, label="📝  BAŞVURU YAP", custom_id="basvuru_ac")
     view.add_item(btn)
     return view
 
 def yetkili_view(user_id: int):
+    """Yetkili kanalına düşen yönetim butonları"""
     view = discord.ui.View(timeout=None)
     uid  = str(user_id)
     view.add_item(discord.ui.Button(style=discord.ButtonStyle.success, label="✅  Onayla",           custom_id=f"onay:{uid}"))
@@ -30,7 +34,8 @@ def yetkili_view(user_id: int):
     view.add_item(discord.ui.Button(style=discord.ButtonStyle.primary, label="🎤  Mülakat Onayı Ver", custom_id=f"mulakat:{uid}"))
     return view
 
-# ── MODAL ──
+# ── BAŞVURU MODALI ─────────────────────────────────────────────────────────────
+
 class BasvuruModal(discord.ui.Modal, title="🚔 Polis Departmanı Başvurusu"):
     ooc_isim = discord.ui.TextInput(label="「👮」 OOC İsminiz", placeholder="Adınız Soyadınız", max_length=50)
     ooc_yas  = discord.ui.TextInput(label="「👮」 OOC Yaşınız", placeholder="Örn: 20", max_length=3)
@@ -55,11 +60,18 @@ class BasvuruModal(discord.ui.Modal, title="🚔 Polis Departmanı Başvurusu"):
         embed.set_footer(text=f"Kullanıcı ID: {interaction.user.id}", icon_url=interaction.user.display_avatar.url)
         embed.timestamp = discord.utils.utcnow()
 
+        # Yetkili kanalına mesaj gönder ve rolü etiketle
         kanal = bot.get_channel(BASVURU_GELEN_KANAL_ID)
-        await kanal.send(embed=embed, view=yetkili_view(interaction.user.id))
+        await kanal.send(
+            content=f"<@&{YETKILI_ROL_ID}> yeni bir başvuru geldi!", 
+            embed=embed, 
+            view=yetkili_view(interaction.user.id)
+        )
+        
         await interaction.followup.send("✅ Başvurunuz iletildi! Yetkililerin incelemesini bekleyiniz.", ephemeral=True)
 
-# ── ETKİLEŞİM YAKALAYICI ──
+# ── TÜM ETKİLEŞİMLERİ YAKALAMA (BUTONLAR) ──────────────────────────────────────
+
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type != discord.InteractionType.component:
@@ -67,93 +79,87 @@ async def on_interaction(interaction: discord.Interaction):
 
     custom_id = interaction.data.get("custom_id", "")
 
+    # Başvuru formunu açma
     if custom_id == "basvuru_ac":
         await interaction.response.send_modal(BasvuruModal())
         return
 
-    if ":" in custom_id and custom_id.split(":")[0] in ("onay", "red", "mulakat"):
-        if not interaction.user.guild_permissions.manage_roles:
-            await interaction.response.send_message("❌ Yetkin yok.", ephemeral=True)
-            return
-
-        await interaction.response.defer()
+    # Yetkili butonları (Onay, Red, Mülakat)
+    if ":" in custom_id:
         action, uid = custom_id.split(":", 1)
-        user_id = int(uid)
-        hedef   = interaction.guild.get_member(user_id)
-        embed   = interaction.message.embeds[0]
+        if action in ("onay", "red", "mulakat"):
+            if not interaction.user.guild_permissions.manage_roles:
+                await interaction.response.send_message("❌ Bu işlemi yapmak için yetkin yok.", ephemeral=True)
+                return
 
-        if not hedef:
-            await interaction.followup.send("❌ Kullanıcı sunucuda bulunamadı.", ephemeral=True)
-            return
+            await interaction.response.defer()
+            user_id = int(uid)
+            hedef   = interaction.guild.get_member(user_id)
+            embed   = interaction.message.embeds[0]
 
-        if action == "onay":
-            rol = interaction.guild.get_role(MULAKAT_ONAY_ROLE_ID)
-            if rol:
-                try:
-                    await hedef.add_roles(rol)
-                except discord.Forbidden:
-                    await interaction.followup.send("❌ Onay rolü verilemedi, bot yetkisini kontrol et.", ephemeral=True)
+            if not hedef:
+                await interaction.followup.send("❌ Kullanıcı sunucuda bulunamadı.", ephemeral=True)
+                return
 
-            embed.colour = 0x2ECC71
-            embed.title  = "🚔 POLİS BAŞVURUSU — ✅ ONAYLANDI"
-            dm = discord.Embed(title="✅ Başvurunuz Onaylandı!", color=0x2ECC71,
-                                description="**Polis Departmanı** başvurunuz **kabul edildi!**\n\n> Başarılar! 🚔")
-            dm.set_footer(text=f"Yetkili: {interaction.user}")
-            dm.timestamp = discord.utils.utcnow()
-            try: await hedef.send(embed=dm)
-            except discord.Forbidden: pass
-            
+            # --- ONAY İŞLEMİ ---
+            if action == "onay":
+                rol = interaction.guild.get_role(MULAKAT_ONAY_ROLE_ID)
+                if rol: await hedef.add_roles(rol)
+                
+                embed.colour = 0x2ECC71
+                embed.title  = "🚔 POLİS BAŞVURUSU — ✅ ONAYLANDI"
+                dm_text = "Başvurunuz **onaylandı**! Aramıza hoş geldiniz."
+                msg_text = f"✅ {hedef.mention} onaylandı ve rolü verildi."
+
+            # --- RED İŞLEMİ ---
+            elif action == "red":
+                rol = interaction.guild.get_role(RED_ROLE_ID)
+                if rol: await hedef.add_roles(rol)
+                
+                embed.colour = 0xE74C3C
+                embed.title  = "🚔 POLİS BAŞVURUSU — ❌ REDDEDİLDİ"
+                dm_text = "Başvurunuz maalesef **reddedildi**."
+                msg_text = f"❌ {hedef.mention} reddedildi ve red rolü verildi."
+
+            # --- MÜLAKAT ONAYI İŞLEMİ ---
+            elif action == "mulakat":
+                rol = interaction.guild.get_role(MULAKAT_ONAY_ROLE_ID)
+                if rol: await hedef.add_roles(rol)
+                
+                embed.colour = 0x3498DB
+                embed.title  = "🚔 POLİS BAŞVURUSU — 🎤 MÜLAKAT ONAYI VERİLDİ"
+                dm_text = "Mülakat perminiz tanımlandı! Mülakat kanalına geçebilirsiniz."
+                msg_text = f"🎤 {hedef.mention} mülakat onayı aldı ve rolü verildi."
+
+            # Ortak DM Gönderme ve Mesaj Güncelleme
+            try:
+                dm = discord.Embed(title=embed.title, description=dm_text, color=embed.color)
+                dm.set_footer(text=f"İşlemi Yapan: {interaction.user}")
+                await hedef.send(embed=dm)
+            except: pass
+
             await interaction.message.edit(embed=embed, view=None)
-            await interaction.followup.send(f"✅ {hedef.mention} onaylandı ve rolü verildi.", ephemeral=True)
+            await interaction.followup.send(msg_text, ephemeral=True)
 
-        elif action == "red":
-            rol = interaction.guild.get_role(RED_ROLE_ID)
-            if rol:
-                try:
-                    await hedef.add_roles(rol)
-                except discord.Forbidden:
-                    await interaction.followup.send("❌ Red rolü verilemedi, bot yetkisini kontrol et.", ephemeral=True)
+# ── SLASH KOMUTLARI ──────────────────────────────────────────────────────────
 
-            embed.colour = 0xE74C3C
-            embed.title  = "🚔 POLİS BAŞVURUSU — ❌ REDDEDİLDİ"
-            dm = discord.Embed(title="❌ Başvurunuz Reddedildi", color=0xE74C3C,
-                                description="**Polis Departmanı** başvurunuz **reddedildi.**")
-            dm.set_footer(text=f"Yetkili: {interaction.user}")
-            dm.timestamp = discord.utils.utcnow()
-            try: await hedef.send(embed=dm)
-            except discord.Forbidden: pass
-            
-            await interaction.message.edit(embed=embed, view=None)
-            await interaction.followup.send(f"❌ {hedef.mention} reddedildi ve red rolü verildi.", ephemeral=True)
-
-        elif action == "mulakat":
-            rol = interaction.guild.get_role(MULAKAT_ONAY_ROLE_ID)
-            if rol:
-                try:
-                    await hedef.add_roles(rol)
-                except discord.Forbidden:
-                    await interaction.followup.send("❌ Rol verilemedi, bot yetkilerini kontrol et.", ephemeral=True)
-                    return
-            
-            embed.colour = 0x3498DB
-            embed.title  = "🚔 POLİS BAŞVURUSU — 🎤 MÜLAKAT ONAYI VERİLDİ"
-            dm = discord.Embed(title="🎤 Mülakat Onayı Verildi!", color=0x3498DB,
-                                description="**Mülakat Onay** permin verildi!\n\n> Mülakat kanalına girerek mülakatını tamamlayabilirsin.")
-            dm.set_footer(text=f"Yetkili: {interaction.user}")
-            dm.timestamp = discord.utils.utcnow()
-            try: await hedef.send(embed=dm)
-            except discord.Forbidden: pass
-            
-            await interaction.message.edit(embed=embed, view=None)
-            await interaction.followup.send(f"🎤 {hedef.mention} için mülakat onayı ve rolü verildi.", ephemeral=True)
-
-# ── DİĞER KOMUTLAR ──
 @bot.tree.command(name="basvurugonder", description="Başvuru butonunu kanala gönderir.")
 @app_commands.checks.has_permissions(administrator=True)
 async def basvurugonder(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
-    embed = discord.Embed(title="🚔 POLİS DEPARTMANI BAŞVURU SİSTEMİ", color=0x1A1A2E)
-    # ... embed içeriği aynı kalabilir ...
+
+    embed = discord.Embed(
+        title="🚔 POLİS DEPARTMANI BAŞVURU SİSTEMİ",
+        description=(
+            "```\nBAŞVURUNUZ TEKER TEKER İNCELENECEKTİR\n```\n"
+            "Mülakata girebilmek için başvurunuzun **onaylanması** gerekmektedir.\n\n"
+            "Aşağıdaki butona tıklayarak formu doldurabilirsiniz."
+        ),
+        color=0x1A1A2E,
+    )
+    embed.set_footer(text="Polis Departmanı • Başvuru Sistemi")
+    embed.timestamp = discord.utils.utcnow()
+
     kanal = bot.get_channel(BASVURU_KANAL_ID)
     await kanal.send(embed=embed, view=basvuru_buton_view())
     await interaction.followup.send("✅ Başvuru mesajı gönderildi!", ephemeral=True)
@@ -161,6 +167,7 @@ async def basvurugonder(interaction: discord.Interaction):
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f"✅ Bot hazır: {bot.user}")
+    print(f"✅ Bot Aktif: {bot.user}")
 
+# Bot Tokenini Buraya Gir
 bot.run(os.environ["BOT_TOKEN"])
