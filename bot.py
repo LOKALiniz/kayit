@@ -9,8 +9,8 @@ KAYITSIZ_ROL_ID = 1484188685757972582
 ADMIN_KANAL_ID  = 1486072691172704276
 KAYIT_KANAL_ID  = 1484188687440019644
 
-KABUL_ROL_ID    = 1484188685757972580   # kabul'e basınca verilecek rol
-RED_ROL_ID      = 1484188685757972581   # red'e basınca verilecek rol
+KABUL_ROL_ID    = 1484188685757972580  # kabul'e basınca verilecek rol
+RED_ROL_ID      = 1484188685757972581  # red'e basınca verilecek rol
 # ─────────────────────────────────────────────
 
 intents = discord.Intents.default()
@@ -47,6 +47,7 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
     )
     ic_ve_ek = discord.ui.TextInput(
         label="IC Bilgiler & Ek Bilgiler",
+
         style=discord.TextStyle.paragraph,
         placeholder=(
             "IC İsim | IC Yaş | Daha önce legal rol?\n"
@@ -138,7 +139,7 @@ class KabulButon(discord.ui.Button):
         hatalar: list[str] = []
 
         # Kabul rolünü ver
-        kabul_rol = guild.get_role(KABUL_ROL_ID)
+        kabul_rol = guild.get_role(1484188685757972580)
         if kabul_rol:
             try:
                 await hedef.add_roles(kabul_rol, reason="SASP Başvuru – Kabul")
@@ -202,7 +203,7 @@ class RedButon(discord.ui.Button):
         hatalar: list[str] = []
 
         # Red rolünü ver
-        red_rol = guild.get_role(RED_ROL_ID)
+        red_rol = guild.get_role(1484188685757972581)
         if red_rol:
             try:
                 await hedef.add_roles(red_rol, reason="SASP Başvuru – Red")
