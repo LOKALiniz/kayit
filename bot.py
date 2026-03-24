@@ -1,17 +1,15 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import json
-import os
 
 # ─────────────────────────────────────────────
 #  KONFİGÜRASYON  –  Buraya kendi değerlerini gir
 # ─────────────────────────────────────────────
 BOT_TOKEN        = "BOT_TOKEN_BURAYA"
-KAYITLI_ROL_ID   = 1484188685812629576   # kayıt tuşuna basılınca verilecek rol
-KAYITSIZ_ROL_ID  = 1484188685757972582   # başvurucu rolü
-ADMIN_KANAL_ID   = 1486072691172704276   # ← başvuruların düşeceği kanal ID'si
-KAYIT_KANAL_ID   = 1484188687440019644   # ← /saspkayıt komutunun kullanılacağı kanal (0 = hepsi)
+KAYITLI_ROL_ID   = 1484188685812629576
+KAYITSIZ_ROL_ID  = 1484188685757972582
+ADMIN_KANAL_ID   = 1486072691172704276
+KAYIT_KANAL_ID   = 1484188687440019644
 
 RUTBE_ROLLERI: dict[str, int] = {
     "Cadet":           1484188685812629581,
@@ -25,7 +23,6 @@ RUTBE_ROLLERI: dict[str, int] = {
     "Lieutenant I":    1484188685824950341,
     "Lieutenant II":   1484188685850120192,
     "Captain":         1484188685850120193,
-
 }
 # ─────────────────────────────────────────────
 
@@ -35,7 +32,6 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Geçici hafıza: {hedef_user_id: seçilen_rütbe}
 secilen_rutbe: dict[int, str] = {}
 
 
@@ -65,11 +61,7 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
         max_length=40,
     )
     ic_ve_ek = discord.ui.TextInput(
-        label="IC Bilgiler & Ek Bilgiler\n" \
-        "IC İsim | IC Yaş | Daha önce legal rol?\n"
-        "Aktiflik | Neden katılmak istiyorsun? | Neden alınmalısın?\n"
-         "CK kabul | Kural kabul"
-        
+        label="IC Bilgiler & Ek Bilgiler",
         style=discord.TextStyle.paragraph,
         placeholder=(
             "IC İsim | IC Yaş | Daha önce legal rol?\n"
@@ -88,11 +80,11 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
             name=str(interaction.user),
             icon_url=interaction.user.display_avatar.url,
         )
-        embed.add_field(name="「👮」OOC İsim",      value=self.ooc_isim.value,   inline=True)
-        embed.add_field(name="「👮」Yaş",            value=self.yas.value,        inline=True)
+        embed.add_field(name="「👮」OOC İsim",      value=self.ooc_isim.value,    inline=True)
+        embed.add_field(name="「👮」Yaş",            value=self.yas.value,         inline=True)
         embed.add_field(name="「👮」FiveM Saati",    value=self.fivem_saati.value, inline=True)
-        embed.add_field(name="「👮」Map / Ses",      value=self.map_ses.value,    inline=True)
-        embed.add_field(name="「📄」IC & Ek Bilgi", value=self.ic_ve_ek.value,   inline=False)
+        embed.add_field(name="「👮」Map / Ses",      value=self.map_ses.value,     inline=True)
+        embed.add_field(name="「📄」IC & Ek Bilgi", value=self.ic_ve_ek.value,    inline=False)
         embed.set_footer(text=f"Başvurucu ID: {interaction.user.id}")
 
         kanal = bot.get_channel(ADMIN_KANAL_ID)
@@ -110,10 +102,9 @@ class BasvuruFormu(discord.ui.Modal, title="📋 SASP Başvuru Formu"):
 
 
 # ══════════════════════════════════════════════
-#  BAŞVURU BİLDİRİM VIEW (admin kanalına düşer)
+#  BAŞVURU BİLDİRİM VIEW
 # ══════════════════════════════════════════════
 class BasvuruBildirimView(discord.ui.View):
-    """Sadece bilgilendirme amaçlı – admin /saspkayıt ile işlem yapar."""
 
     def __init__(self, basvurucu_id: int):
         super().__init__(timeout=None)
@@ -150,7 +141,7 @@ class RutbeSecici(discord.ui.Select):
 
 
 # ══════════════════════════════════════════════
-#  KAYIT VIEW – Rütbe seçici + Kabul/Red butonları
+#  KAYIT VIEW
 # ══════════════════════════════════════════════
 class KayitView(discord.ui.View):
     def __init__(self, hedef: discord.Member):
@@ -158,7 +149,6 @@ class KayitView(discord.ui.View):
         self.hedef = hedef
         self.add_item(RutbeSecici(hedef.id))
 
-    # ── KABUL ET ──────────────────────────────
     @discord.ui.button(label="✅ Kabul Et", style=discord.ButtonStyle.success)
     async def kabul(self, interaction: discord.Interaction, button: discord.ui.Button):
         rutbe_adi = secilen_rutbe.get(self.hedef.id)
@@ -172,7 +162,6 @@ class KayitView(discord.ui.View):
         guild = interaction.guild
         hatalar: list[str] = []
 
-        # 1) Kayıtlı rolü ver
         kayitli_rol = guild.get_role(KAYITLI_ROL_ID)
         if kayitli_rol:
             try:
@@ -182,7 +171,6 @@ class KayitView(discord.ui.View):
         else:
             hatalar.append(f"Kayıtlı rol bulunamadı (ID: {KAYITLI_ROL_ID}).")
 
-        # 2) Seçilen rütbe rolünü ver
         rutbe_rol_id = RUTBE_ROLLERI.get(rutbe_adi, 0)
         if rutbe_rol_id:
             rutbe_rol = guild.get_role(rutbe_rol_id)
@@ -194,9 +182,8 @@ class KayitView(discord.ui.View):
             else:
                 hatalar.append(f"{rutbe_adi} rolü sunucuda bulunamadı.")
         else:
-            hatalar.append(f"⚠️ `{rutbe_adi}` için rol ID'si henüz ayarlanmamış (config.py).")
+            hatalar.append(f"⚠️ `{rutbe_adi}` için rol ID'si henüz ayarlanmamış.")
 
-        # 3) Kayıtsız rolü kaldır
         kayitsiz_rol = guild.get_role(KAYITSIZ_ROL_ID)
         if kayitsiz_rol and kayitsiz_rol in self.hedef.roles:
             try:
@@ -204,7 +191,6 @@ class KayitView(discord.ui.View):
             except discord.Forbidden:
                 hatalar.append("Kayıtsız rolünü kaldıramadım.")
 
-        # 4) DM – kabul mesajı
         try:
             dm_embed = discord.Embed(
                 title="🚔 SASP Başvurun Kabul Edildi!",
@@ -220,7 +206,6 @@ class KayitView(discord.ui.View):
         except discord.Forbidden:
             hatalar.append("DM gönderemedim (kullanıcı DM kapalı).")
 
-        # 5) Cevap
         sonuc = f"✅ **{self.hedef.mention}** kayıt edildi → Rütbe: **{rutbe_adi}**"
         if hatalar:
             sonuc += "\n\n⚠️ Bazı sorunlar:\n" + "\n".join(f"• {h}" for h in hatalar)
@@ -228,10 +213,8 @@ class KayitView(discord.ui.View):
         await interaction.response.edit_message(content=sonuc, view=None)
         secilen_rutbe.pop(self.hedef.id, None)
 
-    # ── RED ET ────────────────────────────────
     @discord.ui.button(label="❌ Red Et", style=discord.ButtonStyle.danger)
     async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # DM – red mesajı
         try:
             dm_embed = discord.Embed(
                 title="🚔 SASP Başvurun Red Edildi",
@@ -256,10 +239,9 @@ class KayitView(discord.ui.View):
 
 
 # ══════════════════════════════════════════════
-#  BAŞVURU BUTONU VIEW (kayıtsız kişilere gösterilir)
+#  BAŞVURU BUTONU VIEW
 # ══════════════════════════════════════════════
 class BasvuruButonView(discord.ui.View):
-    """Kayıtsız kişilerin formu açmasını sağlar."""
 
     def __init__(self):
         super().__init__(timeout=None)
@@ -286,7 +268,6 @@ class BasvuruButonView(discord.ui.View):
 @bot.tree.command(name="saspkayıt", description="SASP üyesini kayıt et (yetkili komutu)")
 @app_commands.describe(uye="Kayıt edilecek kişi")
 async def sasp_kayit(interaction: discord.Interaction, uye: discord.Member):
-    # Yetki kontrolü (sadece yönetici veya kayıtlı rol)
     if not interaction.user.guild_permissions.manage_roles:
         await interaction.response.send_message(
             "🚫 Bu komutu kullanma yetkin yok.",
@@ -337,7 +318,6 @@ async def basvuru_gonder(interaction: discord.Interaction):
 # ══════════════════════════════════════════════
 @bot.event
 async def on_ready():
-    # Kalıcı view'ı yeniden kaydet (restart sonrası da çalışsın)
     bot.add_view(BasvuruButonView())
 
     try:
